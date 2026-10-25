@@ -1,0 +1,49 @@
+name: Created SRTP regression verification
+
+on:
+  push:
+    branches: [ci-created-srtp-media]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install upstream build dependencies
+        run: |
+          sudo apt-get update
+          cd pkg/deb
+          ./generator.sh
+          ./backports/noble
+          rm -rf debian
+          mv noble debian
+          sudo apt-get build-dep -q -y .
+      - name: Reproduce on unpatched upstream
+        run: |
+          cp daemon/call.c /tmp/created-srtp-fixed-call.c
+          git show 956d7add0900f4e18b302f0593cc50d301c66e1e:daemon/call.c > daemon/call.c
+          make -j2 -C daemon
+          set +e
+          make -C t daemon-tests-create-srtp > /tmp/created-srtp-baseline.log 2>&1
+          baseline_status=$?
+          set -e
+          cat /tmp/created-srtp-baseline.log
+          test "$baseline_status" -ne 0
+          grep -E 'not ok .*SDES disabled: no crypto attributes|not ok .*DTLS disabled|not ok .*output crypto context uses selected suite' /tmp/created-srtp-baseline.log
+          cp /tmp/created-srtp-fixed-call.c daemon/call.c
+      - name: Verify fixed daemon and adjacent media suites
+        run: |
+          make -j2 -C daemon
+          make -C t daemon-tests-create-srtp daemon-tests-create daemon-tests-created-subscriptions daemon-tests-pubsub
+      - name: Upload reproduction log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: created-srtp-baseline
+          path: /tmp/created-srtp-baseline.log
