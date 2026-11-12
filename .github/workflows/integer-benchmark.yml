@@ -28,8 +28,11 @@ jobs:
           git clone --quiet --depth 1 --branch mr26.0.1.28 https://github.com/sipwise/rtpengine.git baseline
           test "$(git -C baseline rev-parse HEAD)" = 71047ec21f8e29418c5135947417a15b61b286be
           cp -a baseline patched
+          cp -a baseline optimized
           git -C patched apply --check "$PWD/bench/integer-fix.patch"
           git -C patched apply "$PWD/bench/integer-fix.patch"
+          git -C optimized apply --check "$PWD/bench/integer-optimized.patch"
+          git -C optimized apply "$PWD/bench/integer-optimized.patch"
       - name: Build, verify, and benchmark
         env:
           EXPECTED_ARCH: ${{ matrix.machine }}

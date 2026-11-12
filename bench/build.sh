@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 python3 bench/prepare.py
-for variant in baseline patched; do
+for variant in baseline patched optimized; do
   patched=0
-  if [ "$variant" = patched ]; then patched=1; fi
+  if [ "$variant" != baseline ]; then patched=1; fi
   gcc -O3 -flto=auto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 \
     -Wformat -Werror=format-security -pthread -std=c11 -D_GNU_SOURCE \
     -DPCRE2_CODE_UNIT_WIDTH=8 -DPATCHED="$patched" \
@@ -13,3 +13,8 @@ for variant in baseline patched; do
     $(pkg-config --libs glib-2.0) -lm
   "bench/$variant" --verify
 done
+
+gcc -O3 -D_GNU_SOURCE -std=c11 -fsanitize=address,undefined \
+  -Ioptimized/lib -Ioptimized/include $(pkg-config --cflags glib-2.0) \
+  bench/test-str-optimized.c -o bench/test-str-safety $(pkg-config --libs glib-2.0) -lm
+bench/test-str-safety

@@ -4,3 +4,6 @@ bench/baseline
 bench/patched
 bench/payloads.h
 results-*.json
+optimized/
+bench/optimized
+bench/test-str-safety
