@@ -1,0 +1,42 @@
+name: Integer parsing benchmark
+on:
+  push:
+    branches: [benchmark/integer-parsing-20261112]
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+            machine: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            machine: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler headers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc pkgconf libglib2.0-dev libjson-glib-dev libpcre2-dev libssl-dev
+      - name: Prepare pinned source and patch
+        run: |
+          git clone --quiet --depth 1 --branch mr26.0.1.28 https://github.com/sipwise/rtpengine.git baseline
+          test "$(git -C baseline rev-parse HEAD)" = 71047ec21f8e29418c5135947417a15b61b286be
+          cp -a baseline patched
+          git -C patched apply --check "$PWD/bench/integer-fix.patch"
+          git -C patched apply "$PWD/bench/integer-fix.patch"
+      - name: Build, verify, and benchmark
+        env:
+          EXPECTED_ARCH: ${{ matrix.machine }}
+        run: |
+          bash bench/build.sh
+          python3 bench/run.py --output results-${{ matrix.arch }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: integer-benchmark-${{ matrix.arch }}
+          path: results-${{ matrix.arch }}.json
